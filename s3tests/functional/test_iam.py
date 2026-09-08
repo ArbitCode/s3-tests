@@ -1584,6 +1584,45 @@ def test_delete_nonexistent_policy(iam_root):
     with pytest.raises(iam_root.exceptions.NoSuchEntityException):
         iam_root.delete_policy(PolicyArn=fake_arn)
 
+@pytest.mark.managed_policy
+@pytest.mark.iam_account
+def test_list_policies(iam_root):
+    path = get_iam_path_prefix()
+    name1 = make_iam_name('policy1')
+    name2 = make_iam_name('policy2')
+
+    policy_document = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:ListBucket"],
+            "Resource": ["arn:aws:s3:::mybucket"]
+        }]
+    }
+
+    policy1 = iam_root.create_policy(
+        PolicyName=name1,
+        PolicyDocument=json.dumps(policy_document),
+        Path=path
+    )
+    policy2 = iam_root.create_policy(
+        PolicyName=name2,
+        PolicyDocument=json.dumps(policy_document),
+        Path=path
+    )
+
+    policies = iam_root.list_policies(Scope='All', PathPrefix=path)['Policies']
+    policy_names = [p['PolicyName'] for p in policies]
+
+    assert name1 in policy_names
+    assert name2 in policy_names
+
+    assert "AmazonS3FullAccess" in policy_names
+
+    # Cleanup
+    iam_root.delete_policy(PolicyArn=policy1['Policy']['Arn'])
+    iam_root.delete_policy(PolicyArn=policy2['Policy']['Arn'])
+
 def group_list_names(client, **kwargs):
     p = client.get_paginator('list_groups')
     names = []
