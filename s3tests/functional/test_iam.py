@@ -1623,6 +1623,236 @@ def test_list_policies(iam_root):
     iam_root.delete_policy(PolicyArn=policy1['Policy']['Arn'])
     iam_root.delete_policy(PolicyArn=policy2['Policy']['Arn'])
 
+@pytest.mark.managed_policy
+@pytest.mark.iam_account
+def test_create_policy_version(iam_root):
+    name = make_iam_name('versioned-policy')
+    path = get_iam_path_prefix()
+    policy_document_v1 = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:ListBucket"],
+            "Resource": ["arn:aws:s3:::mybucket"]
+        }]
+    }
+    policy_document_v2 = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:GetObject"],
+            "Resource": ["arn:aws:s3:::mybucket/*"]
+        }]
+    }
+
+    policy = iam_root.create_policy(
+        PolicyName=name,
+        PolicyDocument=json.dumps(policy_document_v1),
+        Path=path
+    )
+    policy_arn = policy['Policy']['Arn']
+
+    version1 = iam_root.create_policy_version(
+        PolicyArn=policy_arn,
+        PolicyDocument=json.dumps(policy_document_v1),
+        SetAsDefault=False
+    )
+    version2 = iam_root.create_policy_version(
+        PolicyArn=policy_arn,
+        PolicyDocument=json.dumps(policy_document_v2),
+        SetAsDefault=True
+    )
+
+    assert version2['PolicyVersion']['IsDefaultVersion'] is True
+    assert version1['PolicyVersion']['IsDefaultVersion'] is False
+
+    # Cleanup
+    iam_root.delete_policy_version(PolicyArn=policy_arn, VersionId=version1['PolicyVersion']['VersionId'])
+    iam_root.delete_policy(PolicyArn=policy_arn)
+
+@pytest.mark.managed_policy
+@pytest.mark.iam_account
+def test_delete_policy_version(iam_root):
+    name = make_iam_name('versioned-policy')
+    path = get_iam_path_prefix()
+    policy_document_v1 = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:ListBucket"],
+            "Resource": ["arn:aws:s3:::mybucket"]
+        }]
+    }
+    policy_document_v2 = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:GetObject"],
+            "Resource": ["arn:aws:s3:::mybucket/*"]
+        }]
+    }
+
+    policy = iam_root.create_policy(
+        PolicyName=name,
+        PolicyDocument=json.dumps(policy_document_v1),
+        Path=path
+    )
+    policy_arn = policy['Policy']['Arn']
+
+    version1 = iam_root.create_policy_version(
+        PolicyArn=policy_arn,
+        PolicyDocument=json.dumps(policy_document_v1),
+        SetAsDefault=True
+    )
+    version2 = iam_root.create_policy_version(
+        PolicyArn=policy_arn,
+        PolicyDocument=json.dumps(policy_document_v2),
+        SetAsDefault=False
+    )
+
+    # Cleanup
+    iam_root.delete_policy_version(PolicyArn=policy_arn, VersionId=version2['PolicyVersion']['VersionId'])
+    iam_root.delete_policy(PolicyArn=policy_arn)
+
+@pytest.mark.managed_policy
+@pytest.mark.iam_account
+def test_get_policy_version(iam_root):
+    name = make_iam_name('versioned-policy')
+    path = get_iam_path_prefix()
+    policy_document_v1 = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:ListBucket"],
+            "Resource": ["arn:aws:s3:::mybucket"]
+        }]
+    }
+
+    policy = iam_root.create_policy(
+        PolicyName=name,
+        PolicyDocument=json.dumps(policy_document_v1),
+        Path=path
+    )
+    policy_arn = policy['Policy']['Arn']
+
+    version1 = iam_root.create_policy_version(
+        PolicyArn=policy_arn,
+        PolicyDocument=json.dumps(policy_document_v1),
+        SetAsDefault=True
+    )
+
+    fetched_version = iam_root.get_policy_version(
+        PolicyArn=policy_arn,
+        VersionId=version1['PolicyVersion']['VersionId']
+    )
+
+    assert fetched_version['PolicyVersion']['VersionId'] == version1['PolicyVersion']['VersionId']
+    assert fetched_version['PolicyVersion']['IsDefaultVersion'] is True
+
+    # Cleanup
+    iam_root.delete_policy(PolicyArn=policy_arn)
+
+@pytest.mark.managed_policy
+@pytest.mark.iam_account
+def test_list_policy_versions(iam_root):
+    name = make_iam_name('versioned-policy')
+    path = get_iam_path_prefix()
+    policy_document_v1 = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:ListBucket"],
+            "Resource": ["arn:aws:s3:::mybucket"]
+        }]
+    }
+    policy_document_v2 = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:GetObject"],
+            "Resource": ["arn:aws:s3:::mybucket/*"]
+        }]
+    }
+
+    policy = iam_root.create_policy(
+        PolicyName=name,
+        PolicyDocument=json.dumps(policy_document_v1),
+        Path=path
+    )
+    policy_arn = policy['Policy']['Arn']
+
+    version1 = iam_root.create_policy_version(
+        PolicyArn=policy_arn,
+        PolicyDocument=json.dumps(policy_document_v1),
+        SetAsDefault=True
+    )
+    version2 = iam_root.create_policy_version(
+        PolicyArn=policy_arn,
+        PolicyDocument=json.dumps(policy_document_v2),
+        SetAsDefault=True
+    )
+
+    versions = iam_root.list_policy_versions(PolicyArn=policy_arn)['Versions']
+    version_ids = [v['VersionId'] for v in versions]
+
+    assert version1['PolicyVersion']['VersionId'] in version_ids
+    assert version2['PolicyVersion']['VersionId'] in version_ids
+
+    # Cleanup
+    iam_root.delete_policy_version(PolicyArn=policy_arn, VersionId=version1['PolicyVersion']['VersionId'])
+    iam_root.delete_policy(PolicyArn=policy_arn)
+
+@pytest.mark.managed_policy
+@pytest.mark.iam_account
+def test_set_default_policy_version(iam_root):
+    name = make_iam_name('versioned-policy')
+    path = get_iam_path_prefix()
+    policy_document_v1 = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:ListBucket"],
+            "Resource": ["arn:aws:s3:::mybucket"]
+        }]
+    }
+    policy_document_v2 = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:GetObject"],
+            "Resource": ["arn:aws:s3:::mybucket/*"]
+        }]
+    }
+
+    policy = iam_root.create_policy(
+        PolicyName=name,
+        PolicyDocument=json.dumps(policy_document_v1),
+        Path=path
+    )
+    policy_arn = policy['Policy']['Arn']
+
+    version1 = iam_root.create_policy_version(
+        PolicyArn=policy_arn,
+        PolicyDocument=json.dumps(policy_document_v1),
+        SetAsDefault=True
+    )
+    version2 = iam_root.create_policy_version(
+        PolicyArn=policy_arn,
+        PolicyDocument=json.dumps(policy_document_v2),
+        SetAsDefault=False
+    )
+
+    # Set version2 as the default version
+    iam_root.set_default_policy_version(PolicyArn=policy_arn, VersionId=version2['PolicyVersion']['VersionId'])
+
+    # Verify that version2 is now the default version
+    fetched_policy = iam_root.get_policy(PolicyArn=policy_arn)
+    assert fetched_policy['Policy']['DefaultVersionId'] == version2['PolicyVersion']['VersionId']
+
+    # Cleanup
+    iam_root.delete_policy_version(PolicyArn=policy_arn, VersionId=version1['PolicyVersion']['VersionId'])
+    iam_root.delete_policy(PolicyArn=policy_arn)
+
 def group_list_names(client, **kwargs):
     p = client.get_paginator('list_groups')
     names = []
