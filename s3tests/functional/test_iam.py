@@ -1853,6 +1853,127 @@ def test_set_default_policy_version(iam_root):
     iam_root.delete_policy_version(PolicyArn=policy_arn, VersionId=version1['PolicyVersion']['VersionId'])
     iam_root.delete_policy(PolicyArn=policy_arn)
 
+@pytest.mark.managed_policy
+@pytest.mark.iam_account
+def test_tag_policy(iam_root):
+    name = make_iam_name('tagged-policy')
+    path = get_iam_path_prefix()
+    policy_document = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:ListBucket"],
+            "Resource": ["arn:aws:s3:::mybucket"]
+        }]
+    }
+
+    policy = iam_root.create_policy(
+        PolicyName=name,
+        PolicyDocument=json.dumps(policy_document),
+        Path=path
+    )
+    policy_arn = policy['Policy']['Arn']
+
+    # Tag the policy
+    tags = [
+        {"Key": "Environment", "Value": "Test"},
+        {"Key": "Owner", "Value": "QA"}
+    ]
+    iam_root.tag_policy(PolicyArn=policy_arn, Tags=tags)
+
+    # List tags and verify
+    response = iam_root.list_policy_tags(PolicyArn=policy_arn)
+    assert len(response['Tags']) == 2
+    assert {"Key": "Environment", "Value": "Test"} in response['Tags']
+    assert {"Key": "Owner", "Value": "QA"} in response['Tags']
+
+    # Untag the policy
+    iam_root.untag_policy(PolicyArn=policy_arn, TagKeys=["Environment"])
+
+    # List tags and verify
+    response = iam_root.list_policy_tags(PolicyArn=policy_arn)
+    assert len(response['Tags']) == 1
+    assert {"Key": "Owner", "Value": "QA"} in response['Tags']
+
+    # Cleanup
+    iam_root.delete_policy(PolicyArn=policy_arn)
+
+@pytest.mark.managed_policy
+@pytest.mark.iam_account
+def test_untag_policy(iam_root):
+    name = make_iam_name('tagged-policy')
+    path = get_iam_path_prefix()
+    policy_document = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:ListBucket"],
+            "Resource": ["arn:aws:s3:::mybucket"]
+        }]
+    }
+
+    policy = iam_root.create_policy(
+        PolicyName=name,
+        PolicyDocument=json.dumps(policy_document),
+        Path=path
+    )
+    policy_arn = policy['Policy']['Arn']
+
+    # Tag the policy
+    tags = [
+        {"Key": "Environment", "Value": "Test"},
+        {"Key": "Owner", "Value": "QA"}
+    ]
+    iam_root.tag_policy(PolicyArn=policy_arn, Tags=tags)
+
+    # Untag the policy
+    iam_root.untag_policy(PolicyArn=policy_arn, TagKeys=["Environment"])
+
+    # List tags and verify
+    response = iam_root.list_policy_tags(PolicyArn=policy_arn)
+    assert len(response['Tags']) == 1
+    assert {"Key": "Owner", "Value": "QA"} in response['Tags']
+
+    # Cleanup
+    iam_root.delete_policy(PolicyArn=policy_arn)
+
+@pytest.mark.managed_policy
+@pytest.mark.iam_account
+def test_list_policy_tags(iam_root):
+    name = make_iam_name('tagged-policy')
+    path = get_iam_path_prefix()
+    policy_document = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:ListBucket"],
+            "Resource": ["arn:aws:s3:::mybucket"]
+        }]
+    }
+
+    policy = iam_root.create_policy(
+        PolicyName=name,
+        PolicyDocument=json.dumps(policy_document),
+        Path=path
+    )
+    policy_arn = policy['Policy']['Arn']
+
+    # Tag the policy
+    tags = [
+        {"Key": "Environment", "Value": "Test"},
+        {"Key": "Owner", "Value": "QA"}
+    ]
+    iam_root.tag_policy(PolicyArn=policy_arn, Tags=tags)
+
+    # List tags and verify
+    response = iam_root.list_policy_tags(PolicyArn=policy_arn)
+    assert len(response['Tags']) == 2
+    assert {"Key": "Environment", "Value": "Test"} in response['Tags']
+    assert {"Key": "Owner", "Value": "QA"} in response['Tags']
+
+    # Cleanup
+    iam_root.delete_policy(PolicyArn=policy_arn)
+
 def group_list_names(client, **kwargs):
     p = client.get_paginator('list_groups')
     names = []
