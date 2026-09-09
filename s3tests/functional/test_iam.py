@@ -2379,6 +2379,82 @@ def test_list_attached_role_policies(iam_root):
     iam_root.delete_role(RoleName=role_name)
     iam_root.delete_policy(PolicyArn=policy_arn)
 
+@pytest.mark.managed_policy
+@pytest.mark.iam_account
+def test_list_entities_for_policy(iam_root):
+    name = make_iam_name('policy-entities')
+    path = get_iam_path_prefix()
+    policy_document = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Action": ["s3:ListBucket"],
+            "Resource": ["arn:aws:s3:::mybucket"]
+        }]
+    }
+
+    policy = iam_root.create_policy(
+        PolicyName=name,
+        PolicyDocument=json.dumps(policy_document),
+        Path=path
+    )
+    policy_arn = policy['Policy']['Arn']
+
+    # Create a user, group, and role
+    user_name = make_iam_name('test-user')
+    group_name = make_iam_name('test-group')
+    role_name = make_iam_name('test-role')
+    role_name1 = make_iam_name('test-role1')
+
+    iam_root.create_user(UserName=user_name, Path=path)
+    iam_root.create_group(GroupName=group_name, Path=path)
+    assume_role_policy_document = {
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Principal": {"Service": "ec2.amazonaws.com"},
+            "Action": "sts:AssumeRole"
+        }]
+    }
+    iam_root.create_role(
+        RoleName=role_name,
+        AssumeRolePolicyDocument=json.dumps(assume_role_policy_document),
+        Path=path
+    )
+    iam_root.create_role(
+        RoleName=role_name1,
+        AssumeRolePolicyDocument=json.dumps(assume_role_policy_document),
+        Path=path
+    )
+
+    # Attach the policy to the user, group, and role
+    iam_root.attach_user_policy(UserName=user_name, PolicyArn=policy_arn)
+    iam_root.attach_group_policy(GroupName=group_name, PolicyArn=policy_arn)
+    iam_root.attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
+    iam_root.attach_role_policy(RoleName=role_name1, PolicyArn=policy_arn)
+
+    # List entities for the policy and verify
+    response = iam_root.list_entities_for_policy(PolicyArn=policy_arn)
+    users = response['PolicyUsers']
+    groups = response['PolicyGroups']
+    roles = response['PolicyRoles']
+
+    assert any(u['UserName'] == user_name for u in users)
+    assert any(g['GroupName'] == group_name for g in groups)
+    assert any(r['RoleName'] == role_name for r in roles)
+    assert any(r['RoleName'] == role_name1 for r in roles)
+
+    # Cleanup
+    iam_root.detach_user_policy(UserName=user_name, PolicyArn=policy_arn)
+    iam_root.detach_group_policy(GroupName=group_name, PolicyArn=policy_arn)
+    iam_root.detach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
+    iam_root.detach_role_policy(RoleName=role_name1, PolicyArn=policy_arn)
+    iam_root.delete_user(UserName=user_name)
+    iam_root.delete_group(GroupName=group_name)
+    iam_root.delete_role(RoleName=role_name)
+    iam_root.delete_role(RoleName=role_name1)
+    iam_root.delete_policy(PolicyArn=policy_arn)
+
 def group_list_names(client, **kwargs):
     p = client.get_paginator('list_groups')
     names = []
